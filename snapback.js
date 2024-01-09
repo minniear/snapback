@@ -222,7 +222,7 @@ async function getPic(browser, page, url, io) {
     update_record(url,"text_path",'report/' + file_name + '.txt')
     update_record(url,"captured", 1)
     console.log("queue:[" + myQueue.length.toString() + "/" + allServices.length.toString() + "]threads[" + active_threads.toString() + "] captured: " + url)
-    io.emit("server_message","queue:[" + myQueue.length.toString() + "/" + allServices.length.toString() + "]threads[" + active_threads.toString() + "] captured: " + url)
+    io.emit("server_message","queue:[" + myQueue.length.toString() + "/" + allServices.length.toString() + "]threads[" + active_threads.toString() + "] captured: " + url, 'primary')
     md5File('report/' + file_name + '.txt', (err, hash) => {
       if (err) {
         console.log("problem getting file stats for:" + file_name)
@@ -241,7 +241,7 @@ async function getPic(browser, page, url, io) {
   }catch(err){
     //console.log(err)
     console.log("queue:[" + myQueue.length.toString() + "/" + allServices.length.toString() + "]threads[" + active_threads.toString() + "] problem capturing page: " + url)
-    io.emit("server_message","queue:[" + myQueue.length.toString() + "/" + allServices.length.toString() + "]threads[" + active_threads.toString() + "] problem capturing page: " + url)
+    io.emit("server_message","queue:[" + myQueue.length.toString() + "/" + allServices.length.toString() + "]threads[" + active_threads.toString() + "] problem capturing page: " + url, 'warning')
     update_record(url,"error", 1)
     io.emit('show_error', url)
     await page.close()
@@ -287,7 +287,7 @@ async function process_queue(browser,io){
   }else if((active_threads == 0) & (allServices.length > 0)){
     await browser.close();
     scrape_emails = false
-    io.emit("server_message", "Done!")
+    io.emit("server_message", "Done!", 'success')
   }
 }
 
@@ -317,7 +317,7 @@ async function process_file(request,io) {
   );
 
   if(request.file_path.match(/nessus$/ig)){
-    io.emit('server_message', "processing as Nessus file: "+ request.file_path);
+    io.emit('server_message', "processing as Nessus file: "+ request.file_path, 'info');
     lineReader.eachLine(request.file_path, function(line) {
       if (line.match(/<ReportHost/i)){
         xml_buffer += line + "\n";
@@ -335,14 +335,14 @@ async function process_file(request,io) {
     await wait(2000)
     process_queue(browser,io)
   }else if(request.file_path.match(/txt$/ig)){
-    io.emit('server_message', "processing as flat txt file: "+ request.file_path);
+    io.emit('server_message', "processing as flat txt file: "+ request.file_path, 'info');
     lineReader.eachLine(request.file_path, function(line) {
       push_to_queue(line, browser, io);
     });
     await wait(1000)
     process_queue(browser,io)
   }else if(request.file_path.match(/js$|json/ig)){
-    io.emit('server_message', "processing as ScopeCreep export file: "+ request.file_path);
+    io.emit('server_message', "processing as ScopeCreep export file: "+ request.file_path, 'info');
     full_file = fs.readFileSync(request.file_path, "utf8")
     report_object = JSON.parse(full_file)
     for(i=0; i<report_object.nodes.length; i++){
@@ -369,7 +369,7 @@ async function process_file(request,io) {
     await wait(1000)
     process_queue(browser,io)
   }else if(request.file_path.match(/xml$/ig)){
-    io.emit('server_message', "processing as Nmap file: "+ request.file_path);
+    io.emit('server_message', "processing as Nmap file: "+ request.file_path, 'info');
     lineReader.eachLine(request.file_path, function(line) {
       if (line.match(/<host /i)){
         xml_buffer += line + "\n";
@@ -386,14 +386,14 @@ async function process_file(request,io) {
     await wait(2000)
     process_queue(browser,io)
   }else{
-    io.emit('server_message', "Snapback currently only supports .nessus, flat .txt url files, .xml nmap files, and ScopeCreep exports. Try again...");
+    io.emit('server_message', "Snapback currently only supports .nessus, flat .txt url files, .xml nmap files, and ScopeCreep exports. Try again...", 'danger');
     await browser.close();
   }
 }
 
 //continue with newly generated queue
 async function resume_scan(request, io) {
-  io.emit('server_message', "processing unfinished queue from DB" );
+  io.emit('server_message', "processing unfinished queue from DB", 'info');
 
   scrape_emails = request.scrape_emails
 
@@ -448,6 +448,18 @@ async function resume_scan(request, io) {
 
   app.get('/jquery.min.js', function(req, res){
     res.sendFile(__dirname + '/node_modules/jquery/dist/jquery.min.js');
+  });
+
+  app.get('/functions.js', function(req, res){
+    res.sendFile(__dirname + '/functions.js');
+  });
+
+  app.get('/buttons.js', function(req, res){
+    res.sendFile(__dirname + '/buttons.js');
+  });
+
+  app.get('/socketio.js', function(req, res){
+    res.sendFile(__dirname + '/socketio.js');
   });
 
   app.get('/all_services', function(req, res){
